@@ -1,6 +1,7 @@
 Digital Implementation of Agricola Boardgame
 
 ###Phase 1 - Minimum Viable Product: 2 Player Family Mode
+
 **Stage 1:** C++ Backend/API
 
 **Stage 2:** React Frontend
