@@ -69,10 +69,10 @@ struct FieldSpace : PlayerBoardSpace {
 	bool sow(FieldType type);
 	
 	/*
-	* Reduces quantity by 1; reverts field typ to empty if quantity == 0;
-	* Returns true if successful; false if target field is already empty;
+	* Reduces quantity by 1; reverts field type to empty if quantity becomes 0;
+	* Returns FieldType at start of harvest;
 	*/
-	bool harvest();
+	FieldType harvest();
 };
 
 /*
@@ -95,6 +95,7 @@ struct PastureSpace : PlayerBoardSpace {
 		stable(stable), capacity(capacity),	quantity(0), 
 		animal_type(AnimalType::none), joined_pasture(joined_to),
 		PlayerBoardSpace(position, SpaceType::pasture) {}
+
 };
 
 /*
@@ -143,8 +144,16 @@ public:
 	*/
 	bool addPet(int room_index, PastureSpace::AnimalType pet_type);
 
+	/*
+	* Moves pet to room at given index;  Returns true on success;
+	* Returns false if no pet exists, or if space at index not a room
+	*/
 	bool movePet(int to_index);
 
+	/*
+	* Removes pet from player board;  Returns true on success;
+	* Returns false if no pet exists
+	*/
 	bool removePet();
 
 	bool hasPet() const;
@@ -163,12 +172,19 @@ public:
 
 private:
 	bool pet;
-	int rooms, fields, pastures, stables, fences;
+	int num_rooms, num_fields, num_pastures, num_stables, num_fences, pet_index;
+	int num_animals, animal_capacity;
 	PlayerBoardSpace* spaces[15];
 	PastureSpace::AnimalType pet_type;
 
 	void initializeSpaces();
 	
+	//Helper to notify empty neighbours of new neighbour type
+	void notifyNeighbours(int index, PlayerBoardSpace::SpaceType caller);
+
+	//Helper to notify specific empty neighbour of new neighbour type
+	void notifyNeighbour(int index, PlayerBoardSpace::SpaceType caller);
+
 	//Helper function to convert space at index to room type
 	void convertToRoom(int index);
 

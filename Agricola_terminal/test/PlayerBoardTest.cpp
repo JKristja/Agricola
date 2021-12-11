@@ -3,9 +3,14 @@
 
 struct GenericPlayerBoard : public ::testing::Test {
 	PlayerBoard* player_board;
+	PlayerBoardSpace* board_space;
+	RoomSpace* room1;
+	RoomSpace* room2;
 
 	virtual void SetUp() {
 		player_board = new PlayerBoard();
+		room1 = (RoomSpace*) player_board->getBoardSpace(5);
+		room2 = (RoomSpace*) player_board->getBoardSpace(10);
 	}
 
 	virtual void TearDown() {
@@ -14,8 +19,6 @@ struct GenericPlayerBoard : public ::testing::Test {
 };
 
 TEST_F(GenericPlayerBoard, boardSetUp) {
-	PlayerBoardSpace* board_space;
-
 	//verify two rooms, no pet, no fields/pastures/stables/fences
 	EXPECT_EQ(player_board->getNumRooms(), 2);
 	EXPECT_FALSE(player_board->hasPet());
@@ -25,7 +28,7 @@ TEST_F(GenericPlayerBoard, boardSetUp) {
 	EXPECT_EQ(player_board->getNumFences(), 0);
 
 	//Verify two wood rooms with markers in pos 5 and 10, rest empty
-		for (int i = 0; i < 15; i++) {
+	for (int i = 0; i < 15; i++) {
 		board_space = player_board->getBoardSpace(i);
 		EXPECT_EQ(board_space->position, i);
 		if (i == 5 || i == 10) {
@@ -55,10 +58,11 @@ TEST_F(GenericPlayerBoard, convertSpaceToRoom) {
 	//test valid conversion to wood room
 	EXPECT_EQ(player_board->getNumRooms(), 2);
 	EXPECT_FALSE(player_board->hasPet());
-	PlayerBoardSpace* board_space = player_board->getBoardSpace(0);
+	board_space = player_board->getBoardSpace(0);
 	ASSERT_EQ(board_space->type, PlayerBoardSpace::SpaceType::empty);
 	ASSERT_TRUE(((EmptySpace*)board_space)->to_room);
-	ASSERT_TRUE(player_board->convertSpace(0, PlayerBoardSpace::SpaceType::room));
+	ASSERT_TRUE(
+		player_board->convertSpace(0, PlayerBoardSpace::SpaceType::room));
 	board_space = player_board->getBoardSpace(0);
 	ASSERT_EQ(board_space->type, PlayerBoardSpace::SpaceType::room);
 	EXPECT_FALSE(((RoomSpace*)board_space)->pet);
@@ -70,17 +74,19 @@ TEST_F(GenericPlayerBoard, convertSpaceToRoom) {
 	EXPECT_TRUE(player_board->upgradeRooms());
 	board_space = player_board->getBoardSpace(1);
 	ASSERT_EQ(board_space->type, PlayerBoardSpace::SpaceType::empty);
-	ASSERT_TRUE(player_board->convertSpace(1, PlayerBoardSpace::SpaceType::room));
+	ASSERT_TRUE(
+		player_board->convertSpace(1, PlayerBoardSpace::SpaceType::room));
 	board_space = player_board->getBoardSpace(1);
 	ASSERT_EQ(board_space->type, PlayerBoardSpace::SpaceType::room);
 	EXPECT_EQ(((RoomSpace*)board_space)->room_type, RoomSpace::RoomType::stone);
 	EXPECT_EQ(player_board->getNumRooms(), 4);
 
 	//test invalid conversion to room from existing room
-	board_space = player_board->getBoardSpace(5);
+	board_space = player_board->getBoardSpace(room1->position);
 	ASSERT_EQ(board_space->type, PlayerBoardSpace::SpaceType::room);
-	ASSERT_FALSE(player_board->convertSpace(5, PlayerBoardSpace::SpaceType::room));
-	board_space = player_board->getBoardSpace(5);
+	ASSERT_FALSE(player_board->convertSpace(room1->position,
+		PlayerBoardSpace::SpaceType::room));
+	board_space = player_board->getBoardSpace(room1->position);
 	ASSERT_EQ(board_space->type, PlayerBoardSpace::SpaceType::room);
 	EXPECT_FALSE(((RoomSpace*)board_space)->pet);
 	EXPECT_TRUE(((RoomSpace*)board_space)->meeple);
@@ -90,7 +96,8 @@ TEST_F(GenericPlayerBoard, convertSpaceToRoom) {
 	board_space = player_board->getBoardSpace(7);
 	ASSERT_EQ(board_space->type, PlayerBoardSpace::SpaceType::empty);
 	ASSERT_FALSE(((EmptySpace*)board_space)->to_room);
-	ASSERT_FALSE(player_board->convertSpace(7, PlayerBoardSpace::SpaceType::room));
+	ASSERT_FALSE(
+		player_board->convertSpace(7, PlayerBoardSpace::SpaceType::room));
 	board_space = player_board->getBoardSpace(7);
 	ASSERT_EQ(board_space->type, PlayerBoardSpace::SpaceType::empty);
 	EXPECT_FALSE(((EmptySpace*)board_space)->to_room);
@@ -101,16 +108,12 @@ TEST_F(GenericPlayerBoard, convertSpaceToRoom) {
 }
 
 TEST_F(GenericPlayerBoard, roomUpgrade) {
-	PlayerBoardSpace* room1 = player_board->getBoardSpace(5);
-	PlayerBoardSpace* room2 = player_board->getBoardSpace(10);
 	player_board->convertSpace(6, PlayerBoardSpace::SpaceType::room);
 	PlayerBoardSpace* room3 = player_board->getBoardSpace(6);
+	ASSERT_EQ(room3->type, PlayerBoardSpace::SpaceType::room);
 	EXPECT_EQ(player_board->getNumRooms(), 3);
 
 	//test upgrade from wood to clay
-	ASSERT_EQ(room1->type, PlayerBoardSpace::SpaceType::room);
-	ASSERT_EQ(room2->type, PlayerBoardSpace::SpaceType::room);
-	ASSERT_EQ(room3->type, PlayerBoardSpace::SpaceType::room);
 	EXPECT_EQ(((RoomSpace*)room1)->room_type, RoomSpace::RoomType::wood);
 	EXPECT_EQ(((RoomSpace*)room2)->room_type, RoomSpace::RoomType::wood);
 	EXPECT_EQ(((RoomSpace*)room3)->room_type, RoomSpace::RoomType::wood);
@@ -137,9 +140,6 @@ TEST_F(GenericPlayerBoard, roomUpgrade) {
 
 TEST_F(GenericPlayerBoard, housePet) {
 	//test add valid pet
-	PlayerBoardSpace* room1 = player_board->getBoardSpace(5);
-	PlayerBoardSpace* room2 = player_board->getBoardSpace(10);
-
 	EXPECT_TRUE(
 		player_board->addPet(room1->position, PastureSpace::AnimalType::boar));
 	EXPECT_TRUE(player_board->hasPet());
@@ -185,23 +185,112 @@ TEST_F(GenericPlayerBoard, housePet) {
 	EXPECT_FALSE(player_board->removePet());
 
 	//test invalid move non-existant pet
-
+	EXPECT_FALSE(player_board->movePet(room1->position));
+	EXPECT_FALSE(player_board->hasPet());
+	EXPECT_EQ(player_board->getPetType(), PastureSpace::AnimalType::none);
+	EXPECT_FALSE(((RoomSpace*)room1)->pet);
+	EXPECT_FALSE(((RoomSpace*)room2)->pet);
 }
 
 TEST_F(GenericPlayerBoard, convertSpaceToField) {
 	//test valid conversion to first field
+	EXPECT_EQ(player_board->getNumFields(), 0);
+	EXPECT_TRUE(
+		player_board->convertSpace(4, PlayerBoardSpace::SpaceType::field));
+	board_space = player_board->getBoardSpace(4);
+	EXPECT_EQ(player_board->getNumFields(), 1);
+	ASSERT_EQ(board_space->type, PlayerBoardSpace::SpaceType::field);
+	EXPECT_EQ(((FieldSpace*)board_space)->field_type,
+		FieldSpace::FieldType::empty);
+	EXPECT_EQ(((FieldSpace*)board_space)->quantity, 0);
+	EXPECT_TRUE(((EmptySpace*)(player_board->getBoardSpace(3)))->to_field);
+	EXPECT_TRUE(((EmptySpace*)(player_board->getBoardSpace(9)))->to_field);
+	for (int i = 0; i < 15; i++) {
+		if (i != 3 && i != 9) {
+			board_space = player_board->getBoardSpace(i);
+			if (board_space->type == PlayerBoardSpace::SpaceType::empty)
+				EXPECT_FALSE(((EmptySpace*)board_space)->to_field);
+		}
+	}
 
 	//test valid conversion for additional field
+	EXPECT_TRUE(
+		player_board->convertSpace(9, PlayerBoardSpace::SpaceType::field));
+	board_space = player_board->getBoardSpace(9);
+	EXPECT_EQ(player_board->getNumFields(), 2);
+	ASSERT_EQ(board_space->type, PlayerBoardSpace::SpaceType::field);
+	EXPECT_EQ(((FieldSpace*)board_space)->field_type,
+		FieldSpace::FieldType::empty);
+	EXPECT_EQ(((FieldSpace*)board_space)->quantity, 0);
+	EXPECT_TRUE(((EmptySpace*)(player_board->getBoardSpace(8)))->to_field);
+	EXPECT_TRUE(((EmptySpace*)(player_board->getBoardSpace(14)))->to_field);
 
-	//test invalid conversion for additional field
+	//test invalid conversion for additional field from non-empty
+	EXPECT_FALSE(player_board->convertSpace(room1->position,
+		PlayerBoardSpace::SpaceType::field));
+	EXPECT_EQ(room1->type, PlayerBoardSpace::SpaceType::room);
+	EXPECT_EQ(player_board->getNumFields(), 2);
+
+	//test invalid conversion for additional field not-adjacent
+	EXPECT_FALSE(
+		player_board->convertSpace(7, PlayerBoardSpace::SpaceType::field));
+	board_space = player_board->getBoardSpace(7);
+	EXPECT_EQ(board_space->type, PlayerBoardSpace::SpaceType::empty);
+	EXPECT_FALSE(((EmptySpace*)board_space)->to_field);
+	EXPECT_EQ(player_board->getNumFields(), 2);
 }
 
 TEST_F(GenericPlayerBoard, fieldSpace) {
-	//test plant grain
+	ASSERT_TRUE(
+		player_board->convertSpace(8, PlayerBoardSpace::SpaceType::field));
+	ASSERT_TRUE(
+		player_board->convertSpace(3, PlayerBoardSpace::SpaceType::field));
+	
+	FieldSpace* field1 = (FieldSpace*) player_board->getBoardSpace(8);
+	FieldSpace* field2 = (FieldSpace*) player_board->getBoardSpace(3);
 
-	//test plant vegetable
+	//test valid sow grain/vegetable
+	EXPECT_EQ(field1->field_type, FieldSpace::FieldType::empty);
+	EXPECT_EQ(field1->quantity, 0);
+	EXPECT_TRUE(field1->sow(FieldSpace::FieldType::grain));
+	EXPECT_EQ(field1->field_type, FieldSpace::FieldType::grain);
+	EXPECT_EQ(field1->quantity, 3);
+	EXPECT_EQ(field2->field_type, FieldSpace::FieldType::empty);
+	EXPECT_EQ(field2->quantity, 0);
+	EXPECT_TRUE(field2->sow(FieldSpace::FieldType::vegetable));
+	EXPECT_EQ(field2->field_type, FieldSpace::FieldType::vegetable);
+	EXPECT_EQ(field2->quantity, 2);
 
-	//test harvest grain/vegetable
+	//test invalid sow grain/vegetable
+	EXPECT_FALSE(field1->sow(FieldSpace::FieldType::empty));
+	EXPECT_EQ(field1->field_type, FieldSpace::FieldType::grain);
+	EXPECT_EQ(field1->quantity, 3);
+	EXPECT_FALSE(field1->sow(FieldSpace::FieldType::grain));
+	EXPECT_EQ(field1->field_type, FieldSpace::FieldType::grain);
+	EXPECT_EQ(field1->quantity, 3);
+	EXPECT_FALSE(field2->sow(FieldSpace::FieldType::grain));
+	EXPECT_EQ(field2->field_type, FieldSpace::FieldType::vegetable);
+	EXPECT_EQ(field2->quantity, 2);
+
+	//test harvest grain/vegetable mixed with sow
+	EXPECT_EQ(field1->harvest(), FieldSpace::FieldType::grain);
+	EXPECT_EQ(field1->field_type, FieldSpace::FieldType::grain);
+	EXPECT_EQ(field1->quantity, 2);
+	EXPECT_EQ(field1->harvest(), FieldSpace::FieldType::grain);
+	EXPECT_EQ(field1->field_type, FieldSpace::FieldType::grain);
+	EXPECT_EQ(field1->quantity, 1);
+	EXPECT_FALSE(field1->sow(FieldSpace::FieldType::grain));
+	EXPECT_EQ(field1->field_type, FieldSpace::FieldType::grain);
+	EXPECT_EQ(field1->quantity, 1);
+	EXPECT_EQ(field1->harvest(), FieldSpace::FieldType::grain);
+	EXPECT_EQ(field1->field_type, FieldSpace::FieldType::empty);
+	EXPECT_EQ(field1->quantity, 0);
+	EXPECT_EQ(field2->harvest(), FieldSpace::FieldType::vegetable);
+	EXPECT_EQ(field2->field_type, FieldSpace::FieldType::vegetable);
+	EXPECT_EQ(field2->quantity, 1);
+	EXPECT_EQ(field2->harvest(), FieldSpace::FieldType::vegetable);
+	EXPECT_EQ(field2->field_type, FieldSpace::FieldType::empty);
+	EXPECT_EQ(field2->quantity, 0);
 }
 
 TEST_F(GenericPlayerBoard, convertSpaceToPasture) {
@@ -211,7 +300,9 @@ TEST_F(GenericPlayerBoard, convertSpaceToPasture) {
 
 	//test invalid conversion to additional pasture of mixed size/orientation
 
-	//test valid conversion from stable
+	//test valid conversion from stable with animal
+
+	//test valid conversion from stable without animal
 
 	//test invalid conversion from stable
 }
@@ -230,4 +321,10 @@ TEST_F(GenericPlayerBoard, convertSpaceToStable) {
 	//test valid conversion to stable
 
 	//test invalid conversion to stable
+}
+
+TEST_F(GenericPlayerBoard, stableSpace) {
+	//test valid add/remove animal
+
+	//test invalid add/remove animal
 }
