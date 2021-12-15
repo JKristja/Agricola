@@ -294,7 +294,20 @@ TEST_F(GenericPlayerBoard, fieldSpace) {
 }
 
 TEST_F(GenericPlayerBoard, convertSpaceToPasture) {
-	//test valid conversion to first pasture of mixed size/orientation
+	//test valid conversion to first pasture
+	ASSERT_TRUE(
+		player_board->convertSpace(6, PlayerBoardSpace::SpaceType::pasture));
+	EXPECT_EQ(player_board->getNumPastures(), 1);
+	EXPECT_EQ(player_board->getAnimalCapacity(), 3);
+	board_space = player_board->getBoardSpace(6);
+	EXPECT_FALSE(((PastureSpace*)board_space)->stable);
+	EXPECT_EQ(((PastureSpace*)board_space)->capacity, 2);
+	EXPECT_EQ(((PastureSpace*)board_space)->quantity, 0);
+	EXPECT_EQ(((PastureSpace*)board_space)->animal_type, 
+		PastureSpace::AnimalType::none);
+	vector<PastureSpace*> pasture1;
+	pasture1.push_back((PastureSpace*)board_space);
+	EXPECT_EQ(((PastureSpace*)board_space)->linked_pastures, pasture1);
 
 	//test valid conversion to additional pasture of mixed size/orientation
 

@@ -59,7 +59,7 @@ bool PlayerBoard::convertSpace(int index, PlayerBoardSpace::SpaceType to_type) {
 			break;
 		case PlayerBoardSpace::SpaceType::pasture:
 			if (((EmptySpace*)space)->to_pasture) {
-				convertToPasture(index);
+				convertToPasture(vector<int> {index});
 				converted = true;
 			}
 			break;
@@ -73,7 +73,7 @@ bool PlayerBoard::convertSpace(int index, PlayerBoardSpace::SpaceType to_type) {
 	}
 	else if (space->type == PlayerBoardSpace::SpaceType::stable) {
 		if (to_type == PlayerBoardSpace::SpaceType::pasture) {
-			//stub
+			convertToPasture(vector<int> {index});
 			converted = true;
 		}
 	}
@@ -136,8 +136,7 @@ void PlayerBoard::convertToRoom(int index) {
 
 void PlayerBoard::convertToField(int index) {
 	PlayerBoardSpace* old_space = this->spaces[index];
-	this->spaces[index] =
-		new FieldSpace(index);
+	this->spaces[index] = new FieldSpace(index);
 	delete old_space;
 
 	if (num_fields == 0)
@@ -159,7 +158,7 @@ bool FieldSpace::sow(FieldType type) {
 
 FieldSpace::FieldType FieldSpace::harvest() {
 	if (this->field_type == FieldType::empty)
-		return this->field_type;
+		return FieldType::empty;
 
 	FieldType harvested_type = this->field_type;
 	this->quantity -= 1;
@@ -169,8 +168,42 @@ FieldSpace::FieldType FieldSpace::harvest() {
 	return harvested_type;
 }
 
-void PlayerBoard::convertToPasture(int index) {
+// UPDATE TO HAVE ANIMAL TYPE INPUT
+// UPDATE LINKED PASTURE CONVERT TO ALLOW FOR ANIMAL TYPE
+// PLAYER ACTION WILL HAVE TO CHECK IF MIXED TYPE AND PROMPT SELECTION
+// IF NO MIXED TYPE PLAYER ACTION WILL DEFAULT TO EXISTING TYPE
+
+void PlayerBoard::convertToPasture(vector<int> indices) {
+	if (indices.size() == 0)
+		return;
+
+	bool stable;
+	int linked_stables = 0;
+	vector<PastureSpace*> linked_pastures;
+	
+	for (int i = 0; i < indices.size(); i++)
+		if (spaces[indices[i]]->type == PlayerBoardSpace::SpaceType::stable)
+			linked_stables += 1;
+	
+	for (int i = 0; i < indices.size(); i++) {
+		PlayerBoardSpace* old_space = spaces[indices[i]];
+		stable = (old_space->type == PlayerBoardSpace::SpaceType::stable);
+		PastureSpace* new_space = new PastureSpace(i, stable, linked_stables);
+		spaces[indices[i]] = new_space;
+		linked_pastures.push_back(new_space);
+		delete old_space;
+	}
+
+	for (int i = 0; i < indices.size(); i++)
+		((PastureSpace*)spaces[indices[i]])->linked_pastures = linked_pastures;
+
+	this->num_pastures += 1;
+	this->animal_capacity += 2 * indices.size() * pow(2, linked_stables);
+}
+
+bool PlayerBoard::convertToLinkedPasture(vector<int> indices) {
 	//stub
+	return false;
 }
 
 void PlayerBoard::convertToStable(int index) {
@@ -252,4 +285,12 @@ int PlayerBoard::getNumStables() const {
 
 int PlayerBoard::getNumFences() const {
 	return num_fences;
+}
+
+int PlayerBoard::getNumAnimals() const {
+	return num_animals;
+}
+
+int PlayerBoard::getAnimalCapacity() const {
+	return animal_capacity;
 }

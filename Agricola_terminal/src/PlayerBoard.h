@@ -1,6 +1,7 @@
 #pragma once
 #include <string>
 #include <vector>
+#include <cmath>
 
 using namespace std;
 
@@ -79,23 +80,22 @@ struct FieldSpace : PlayerBoardSpace {
 * Pasture board space: cannot be converted to any other type;
 * Can be empty or contain a stable and/or one type of animal;
 * A single pasture may be composed of multiple pasture spaces;
-* Animal capacity is dependant on number of stables within pasture
+* Animal capacity is dependant on number of stables within pasture;
 * Point value is dependent on total pastures:
 *	0 / 1 / 2 / 3 / 4+ pastures:	-1 / 1 / 2 / 3 / 4
 */
 struct PastureSpace : PlayerBoardSpace {
 	enum struct AnimalType { none, sheep, boar, cattle };
 	bool stable;
-	int capacity, quantity;
+	int linked_stables, capacity, quantity;
 	AnimalType animal_type;
-	vector<PastureSpace*> joined_pasture;
+	vector<PastureSpace*> linked_pastures;
 
-	PastureSpace(int position, bool stable, int capacity,
-		vector<PastureSpace*> joined_to) :
-		stable(stable), capacity(capacity),	quantity(0), 
-		animal_type(AnimalType::none), joined_pasture(joined_to),
+	PastureSpace(int position, bool stable, int linked_stables) :
+		stable(stable), linked_stables(linked_stables), 
+		capacity(2 * pow(2, linked_stables)),
+		quantity(0), animal_type(AnimalType::none),
 		PlayerBoardSpace(position, SpaceType::pasture) {}
-
 };
 
 /*
@@ -131,6 +131,15 @@ public:
 	* Replaces existing pointer, and deletes old reference
 	*/
 	bool convertSpace(int index, PlayerBoardSpace::SpaceType to_type);
+
+	/*
+	* Similar to convertSpace, but only for multi-part pasture;
+	* Creates linked multi-space pasture from given orthogonal indices
+	* First index will be set as group leader
+	* Returns true if successful;
+	* Returns false if indices not all orthogonal, or if any spaces are invalid
+	*/
+	bool convertToLinkedPasture(vector<int> indices);
 
 	/*
 	* Upgrade all room spaces to next level (wood->clay->stone);
@@ -170,6 +179,10 @@ public:
 
 	int getNumFences() const;
 
+	int getNumAnimals() const;
+
+	int getAnimalCapacity() const;
+
 private:
 	bool pet;
 	int num_rooms, num_fields, num_pastures, num_stables, num_fences, pet_index;
@@ -190,9 +203,13 @@ private:
 
 	//Helper function to convert space at index to field type
 	void convertToField(int index);
-
-	//Helper function to convert space at index to pasture type
-	void convertToPasture(int index);
+	
+	/*
+	* Helper function to convert space at indices to pasture type;
+	* Removes any animals from included stables and sets animal type to none;
+	* @param indices: indices of spaces to be converted to linked pasture
+	*/
+	void convertToPasture(vector<int> indices);
 
 	//Helper function to convert space at index to stable type
 	void convertToStable(int index);
