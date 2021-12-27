@@ -38,17 +38,12 @@ MainBoard::MainBoard(int pc, bool family) {
 	initializeRoundSpaces();
 	initializeStages();
 	initializeMajorImprovements();
-	/*
-	for (int i = 0; i < sizeof(occupied_spaces) / sizeof(int); i++)
-		this->board_spaces[i]->visible ?
-			this->occupied_spaces[i] = 0 : this->occupied_spaces[i] = -1;
-	*/
 }
 
 MainBoard::~MainBoard() {
-	for (int i = 0; i < sizeof(board_spaces)/sizeof(*board_spaces); i++)
+	for (int i = 0; i < sizeof(board_spaces)/sizeof(*board_spaces); ++i)
 		delete board_spaces[i];
-	for (int i = 0; i < sizeof(major_improvements)/sizeof(MajorImprovement*); i++)
+	for (int i = 0; i < sizeof(major_improvements)/sizeof(MajorImprovement*); ++i)
 		delete major_improvements[i];
 }
 
@@ -69,7 +64,7 @@ void MainBoard::initializeStartingSpaces(int player_count, bool family) {
 			//stub
 			break;
 		default:
-			for (int i = 0; i < 6; i++)
+			for (int i = 0; i < 6; ++i)
 				board_spaces[i] = new BoardSpace("empty", false);
 		}
 		// default 1-2 player spaces
@@ -136,7 +131,7 @@ void MainBoard::initializeStages() {
 	shuffle(round_spaces + 11, round_spaces + 13, seed);
 
 	// assign stages 1 - 6 following starting spaces in board_spaces index + 16
-	for (int i = 0; i < 14; i++) {
+	for (int i = 0; i < 14; ++i) {
 		//check for accumulation spaces
 		if (round_spaces[i].compare(0, 1, "1") == 0) {
 			board_spaces[i + 16] = new AccumulationSpace(round_spaces[i],

@@ -87,14 +87,15 @@ struct FieldSpace : PlayerBoardSpace {
 struct PastureSpace : PlayerBoardSpace {
 	enum struct AnimalType { none, sheep, boar, cattle };
 	bool stable;
-	int linked_stables, capacity, quantity;
+	int linked_stables, linked_size, linked_capacity, linked_quantity;
 	AnimalType animal_type;
 	vector<PastureSpace*> linked_pastures;
 
-	PastureSpace(int position, bool stable, int linked_stables) :
-		stable(stable), linked_stables(linked_stables), 
-		capacity(2 * pow(2, linked_stables)),
-		quantity(0), animal_type(AnimalType::none),
+	PastureSpace(int position, bool stable, int linked_stables, int linked_size,
+		AnimalType animal_type) : stable(stable),
+		linked_stables(linked_stables),	linked_size(linked_size), 
+		linked_capacity(linked_size * 2 * pow(2, linked_stables)),
+		linked_quantity(0), animal_type(animal_type),
 		PlayerBoardSpace(position, SpaceType::pasture) {}
 };
 
@@ -104,11 +105,11 @@ struct PastureSpace : PlayerBoardSpace {
 * Point value = 0
 */
 struct StableSpace : PlayerBoardSpace {
-	bool animal;
+	bool animal, to_pasture;
 	PastureSpace::AnimalType animal_type;
 
-	StableSpace(int position) :	animal(false), 
-		animal_type(PastureSpace::AnimalType::none),
+	StableSpace(int position, bool to_pasture) : animal(false),
+		to_pasture(to_pasture),	animal_type(PastureSpace::AnimalType::none),
 		PlayerBoardSpace(position, SpaceType::stable) {}
 };
 
@@ -135,11 +136,32 @@ public:
 	/*
 	* Similar to convertSpace, but only for multi-part pasture;
 	* Creates linked multi-space pasture from given orthogonal indices
-	* First index will be set as group leader
+	* Animals not of provided type in converted stables will be removed.
 	* Returns true if successful;
 	* Returns false if indices not all orthogonal, or if any spaces are invalid
 	*/
-	bool convertToLinkedPasture(vector<int> indices);
+	bool convertToLinkedPasture(vector<int> indices, 
+		PastureSpace::AnimalType animal_type);
+
+	/*
+	* Adds stable to emptySpace or valid pastureSpace; Max one stable per space;
+	* Returns true if successfull; false if invalid space.
+	*/
+	bool addStable(int index);
+
+	/*
+	* Adds animals of given type to index space.
+	* Returns true if successfull;
+	* False if invalid space, insufficient capacity, or conflicting animal type
+	*/
+	bool addAnimal(int index, int num_animals, PastureSpace::AnimalType type);
+
+	/*
+	* Removes animals from given index space.
+	* Returns true if successful;
+	* False if invalid space, or if removing more animals than present.
+	*/
+	bool removeAnimal(int index, int num_animals);
 
 	/*
 	* Upgrade all room spaces to next level (wood->clay->stone);
@@ -198,6 +220,9 @@ private:
 	//Helper to notify specific empty neighbour of new neighbour type
 	void notifyNeighbour(int index, PlayerBoardSpace::SpaceType caller);
 
+	//Helper to determine if two indices are neighbours
+	bool validNeighbour(int index1, int index2);
+
 	//Helper function to convert space at index to room type
 	void convertToRoom(int index);
 
@@ -206,10 +231,12 @@ private:
 	
 	/*
 	* Helper function to convert space at indices to pasture type;
-	* Removes any animals from included stables and sets animal type to none;
+	* Removes any animals from included stables not matching provided type;
 	* @param indices: indices of spaces to be converted to linked pasture
+	* @param pasture_type: Animal type for converted pasture
 	*/
-	void convertToPasture(vector<int> indices);
+	void convertToPasture(vector<int> indices, 
+		PastureSpace::AnimalType animal_type);
 
 	//Helper function to convert space at index to stable type
 	void convertToStable(int index);

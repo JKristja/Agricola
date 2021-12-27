@@ -16,6 +16,29 @@ struct GenericPlayerBoard : public ::testing::Test {
 	virtual void TearDown() {
 		delete player_board;
 	}
+
+	/*
+	* Test pastureSpace at index against expected given values for each parameter
+	*/
+	void test_pasture(int index, int num_pastures, int animal_capacity,
+		bool stable, int linked_stables, int linked_size, int linked_capacity, 
+		int linked_quantity,
+		PastureSpace::AnimalType animal_type, vector<PastureSpace*> pastures) {
+		board_space = player_board->getBoardSpace(index);
+		ASSERT_EQ(board_space->type, PlayerBoardSpace::SpaceType::pasture);
+		EXPECT_EQ(player_board->getNumPastures(), num_pastures);
+		EXPECT_EQ(player_board->getAnimalCapacity(), animal_capacity);
+		EXPECT_EQ(((PastureSpace*)board_space)->stable, stable);
+		EXPECT_EQ(((PastureSpace*)board_space)->linked_stables, linked_stables);
+		EXPECT_EQ(((PastureSpace*)board_space)->linked_size, linked_size);
+		EXPECT_EQ(((PastureSpace*)board_space)->linked_capacity,
+			linked_capacity);
+		EXPECT_EQ(((PastureSpace*)board_space)->linked_quantity, 
+			linked_quantity);
+		EXPECT_EQ(((PastureSpace*)board_space)->animal_type, animal_type);
+		EXPECT_EQ(((PastureSpace*)board_space)->linked_pastures, pastures);
+	}
+
 };
 
 TEST_F(GenericPlayerBoard, boardSetUp) {
@@ -28,7 +51,7 @@ TEST_F(GenericPlayerBoard, boardSetUp) {
 	EXPECT_EQ(player_board->getNumFences(), 0);
 
 	//Verify two wood rooms with markers in pos 5 and 10, rest empty
-	for (int i = 0; i < 15; i++) {
+	for (int i = 0; i < 15; ++i) {
 		board_space = player_board->getBoardSpace(i);
 		EXPECT_EQ(board_space->position, i);
 		if (i == 5 || i == 10) {
@@ -146,6 +169,7 @@ TEST_F(GenericPlayerBoard, housePet) {
 	EXPECT_TRUE(((RoomSpace*)room1)->pet);
 	EXPECT_FALSE(((RoomSpace*)room2)->pet);
 	EXPECT_EQ(player_board->getPetType(), PastureSpace::AnimalType::boar);
+	EXPECT_EQ(player_board->getNumAnimals(), 1);
 
 	//test add pet when pet exists
 	EXPECT_FALSE(
@@ -154,6 +178,7 @@ TEST_F(GenericPlayerBoard, housePet) {
 	EXPECT_TRUE(((RoomSpace*)room1)->pet);
 	EXPECT_FALSE(((RoomSpace*)room2)->pet);
 	EXPECT_EQ(player_board->getPetType(), PastureSpace::AnimalType::boar);
+	EXPECT_EQ(player_board->getNumAnimals(), 1);
 
 	//test add pet to non-room
 	EXPECT_FALSE(player_board->addPet(11, PastureSpace::AnimalType::boar));
@@ -168,6 +193,7 @@ TEST_F(GenericPlayerBoard, housePet) {
 	EXPECT_FALSE(((RoomSpace*)room1)->pet);
 	EXPECT_TRUE(((RoomSpace*)room2)->pet);
 	EXPECT_EQ(player_board->getPetType(), PastureSpace::AnimalType::boar);
+	EXPECT_EQ(player_board->getNumAnimals(), 1);
 
 	//test invalid move to non-room
 	EXPECT_FALSE(player_board->movePet(14));
@@ -180,6 +206,7 @@ TEST_F(GenericPlayerBoard, housePet) {
 	EXPECT_TRUE(player_board->removePet());
 	EXPECT_FALSE(player_board->hasPet());
 	EXPECT_EQ(player_board->getPetType(), PastureSpace::AnimalType::none);
+	EXPECT_EQ(player_board->getNumAnimals(), 0);
 	EXPECT_FALSE(((RoomSpace*)room1)->pet);
 	EXPECT_FALSE(((RoomSpace*)room2)->pet);
 	EXPECT_FALSE(player_board->removePet());
@@ -205,7 +232,7 @@ TEST_F(GenericPlayerBoard, convertSpaceToField) {
 	EXPECT_EQ(((FieldSpace*)board_space)->quantity, 0);
 	EXPECT_TRUE(((EmptySpace*)(player_board->getBoardSpace(3)))->to_field);
 	EXPECT_TRUE(((EmptySpace*)(player_board->getBoardSpace(9)))->to_field);
-	for (int i = 0; i < 15; i++) {
+	for (int i = 0; i < 15; ++i) {
 		if (i != 3 && i != 9) {
 			board_space = player_board->getBoardSpace(i);
 			if (board_space->type == PlayerBoardSpace::SpaceType::empty)
@@ -297,38 +324,161 @@ TEST_F(GenericPlayerBoard, convertSpaceToPasture) {
 	//test valid conversion to first pasture
 	ASSERT_TRUE(
 		player_board->convertSpace(6, PlayerBoardSpace::SpaceType::pasture));
-	EXPECT_EQ(player_board->getNumPastures(), 1);
-	EXPECT_EQ(player_board->getAnimalCapacity(), 3);
-	board_space = player_board->getBoardSpace(6);
-	EXPECT_FALSE(((PastureSpace*)board_space)->stable);
-	EXPECT_EQ(((PastureSpace*)board_space)->capacity, 2);
-	EXPECT_EQ(((PastureSpace*)board_space)->quantity, 0);
-	EXPECT_EQ(((PastureSpace*)board_space)->animal_type, 
-		PastureSpace::AnimalType::none);
 	vector<PastureSpace*> pasture1;
-	pasture1.push_back((PastureSpace*)board_space);
-	EXPECT_EQ(((PastureSpace*)board_space)->linked_pastures, pasture1);
+	pasture1.push_back((PastureSpace*)player_board->getBoardSpace(6));
+	test_pasture(6, 1, 3, false, 0, 1, 2, 0, 
+		PastureSpace::AnimalType::none,pasture1);
 
 	//test valid conversion to additional pasture of mixed size/orientation
+	ASSERT_TRUE(player_board->convertToLinkedPasture(vector<int> {7,12,13},
+		PastureSpace::AnimalType::sheep));
+	vector<PastureSpace*> pasture2;
+	pasture2.push_back((PastureSpace*)player_board->getBoardSpace(7));
+	pasture2.push_back((PastureSpace*)player_board->getBoardSpace(12));
+	pasture2.push_back((PastureSpace*)player_board->getBoardSpace(13));
+	test_pasture(7, 2, 9, false, 0, 3, 6, 0,
+		PastureSpace::AnimalType::sheep, pasture2);
+	test_pasture(12, 2, 9, false, 0, 3, 6, 0,
+		PastureSpace::AnimalType::sheep, pasture2);
+	test_pasture(13, 2, 9, false, 0, 3, 6, 0,
+		PastureSpace::AnimalType::sheep, pasture2);
 
 	//test invalid conversion to additional pasture of mixed size/orientation
+	//spaces not adjacent to existing pastures
+	EXPECT_FALSE(player_board->convertToLinkedPasture(vector<int> {3,4},
+		PastureSpace::AnimalType::cattle));
+	ASSERT_EQ(player_board->getBoardSpace(2)->type, 
+		PlayerBoardSpace::SpaceType::empty);
+	ASSERT_EQ(player_board->getBoardSpace(3)->type,
+		PlayerBoardSpace::SpaceType::empty);
+	//spaces overlap non-convertable space
+	EXPECT_FALSE(player_board->convertToLinkedPasture(vector<int> {6, 1},
+		PastureSpace::AnimalType::boar));
+	ASSERT_EQ(player_board->getBoardSpace(6)->type,
+		PlayerBoardSpace::SpaceType::pasture);
+	ASSERT_EQ(player_board->getBoardSpace(1)->type,
+		PlayerBoardSpace::SpaceType::empty);
+	test_pasture(6, 2, 9, false, 0, 1, 2, 0,
+		PastureSpace::AnimalType::none, pasture1);
+	//spaces of new pasture not orthogonal, underlying spaces otherwise valid
+	EXPECT_FALSE(player_board->convertToLinkedPasture(vector<int> {1, 14},
+		PastureSpace::AnimalType::none));
+	ASSERT_EQ(player_board->getBoardSpace(1)->type,
+		PlayerBoardSpace::SpaceType::empty);
+	ASSERT_EQ(player_board->getBoardSpace(14)->type,
+		PlayerBoardSpace::SpaceType::empty);
 
 	//test valid conversion from stable with animal
+	ASSERT_TRUE(player_board->addStable(1));
+	ASSERT_TRUE(player_board->addAnimal(1, 1, PastureSpace::AnimalType::boar));
+	ASSERT_TRUE(player_board->convertToLinkedPasture(vector<int> {1}, 
+		PastureSpace::AnimalType::boar));
+	vector<PastureSpace*> pasture3;
+	pasture3.push_back((PastureSpace*)player_board->getBoardSpace(1));
+	test_pasture(1, 3, 13, true, 1, 1, 4, 1,
+		PastureSpace::AnimalType::boar, pasture3);
 
 	//test valid conversion from stable without animal
-
-	//test invalid conversion from stable
+	ASSERT_TRUE(player_board->convertSpace(2,
+		PlayerBoardSpace::SpaceType::stable));
+	ASSERT_TRUE(player_board->convertSpace(2, 
+		PlayerBoardSpace::SpaceType::pasture));
+	vector<PastureSpace*> pasture4;
+	pasture4.push_back((PastureSpace*)player_board->getBoardSpace(2));
+	test_pasture(2, 4, 17, true, 1, 1, 4, 0,
+		PastureSpace::AnimalType::none, pasture4);
 }
 
 TEST_F(GenericPlayerBoard, pastureSpace) {
+	ASSERT_TRUE(
+		player_board->convertSpace(7, PlayerBoardSpace::SpaceType::pasture));
+	ASSERT_TRUE(player_board->convertToLinkedPasture(vector<int> {8, 13},
+		PastureSpace::AnimalType::none));
+	EXPECT_EQ(player_board->getNumPastures(), 2);
+	PastureSpace* pasture1 = (PastureSpace*)player_board->getBoardSpace(7);
+	PastureSpace* pasture2a = (PastureSpace*)player_board->getBoardSpace(8);
+	PastureSpace* pasture2b = (PastureSpace*)player_board->getBoardSpace(13);
+
 	//test pasture size
+	EXPECT_EQ((pasture1->linked_pastures).size(), 1);
+	EXPECT_EQ((pasture2a->linked_pastures).size(), 2);
+	EXPECT_EQ((pasture2b->linked_pastures).size(), 2);
 
 	//test pasture capacity
-
-	//test stable
+	EXPECT_EQ(player_board->getAnimalCapacity(), 7);
+	EXPECT_EQ(player_board->getNumStables(), 0);
+	EXPECT_EQ(pasture1->linked_capacity, 2);
+	EXPECT_EQ(pasture2a->linked_capacity, 4);
+	EXPECT_EQ(pasture2b->linked_capacity, 4);
+	EXPECT_TRUE(player_board->addStable(13));
+	EXPECT_EQ(player_board->getAnimalCapacity(), 11);
+	EXPECT_EQ(player_board->getNumStables(), 1);
+	EXPECT_EQ(pasture1->linked_capacity, 2);
+	EXPECT_EQ(pasture2a->linked_capacity, 8);
+	EXPECT_EQ(pasture2b->linked_capacity, 8);
 
 	//test add/remove animal (existing type and conflicting types)
+	EXPECT_FALSE(player_board->addAnimal(9, 1, PastureSpace::AnimalType::sheep));
+	EXPECT_FALSE(player_board->addAnimal(7, 3, PastureSpace::AnimalType::sheep));
+	EXPECT_FALSE(player_board->addAnimal(7, 2, PastureSpace::AnimalType::none));
+	EXPECT_EQ(pasture1->animal_type, PastureSpace::AnimalType::none);
+	EXPECT_EQ(pasture1->linked_quantity, 0);
+	EXPECT_EQ(player_board->getNumAnimals(), 0);
+	EXPECT_TRUE(player_board->addAnimal(7, 2, PastureSpace::AnimalType::sheep));
+	EXPECT_EQ(pasture1->animal_type, PastureSpace::AnimalType::sheep);
+	EXPECT_EQ(pasture1->linked_quantity, 2);
+	EXPECT_EQ(player_board->getNumAnimals(), 2);
+
+	//add mixed types to multi field incrementally
+	EXPECT_TRUE(player_board->addAnimal(8, 3, PastureSpace::AnimalType::boar));
+	EXPECT_EQ(pasture2a->animal_type, PastureSpace::AnimalType::boar);
+	EXPECT_EQ(pasture2a->linked_quantity, 3);
+	EXPECT_EQ(pasture2b->animal_type, PastureSpace::AnimalType::boar);
+	EXPECT_EQ(pasture2b->linked_quantity, 3);
+	EXPECT_FALSE(player_board->addAnimal(8, 1, PastureSpace::AnimalType::sheep));
+	EXPECT_EQ(pasture2a->animal_type, PastureSpace::AnimalType::boar);
+	EXPECT_EQ(pasture2a->linked_quantity, 3);
+	EXPECT_EQ(pasture2b->animal_type, PastureSpace::AnimalType::boar);
+	EXPECT_EQ(pasture2b->linked_quantity, 3);
+	EXPECT_TRUE(player_board->addAnimal(13, 1, PastureSpace::AnimalType::boar));
+	EXPECT_EQ(pasture2a->animal_type, PastureSpace::AnimalType::boar);
+	EXPECT_EQ(pasture2a->linked_quantity, 4);
+	EXPECT_EQ(pasture2b->animal_type, PastureSpace::AnimalType::boar);
+	EXPECT_EQ(pasture2b->linked_quantity, 4);
+	EXPECT_FALSE(player_board->addAnimal(13, 5, PastureSpace::AnimalType::boar));
+	EXPECT_EQ(pasture2a->animal_type, PastureSpace::AnimalType::boar);
+	EXPECT_EQ(pasture2a->linked_quantity, 4);
+	EXPECT_EQ(pasture2b->animal_type, PastureSpace::AnimalType::boar);
+	EXPECT_EQ(pasture2b->linked_quantity, 4);
+	
+	//check removeAnimal
+	EXPECT_FALSE(player_board->removeAnimal(5, 1));
+	EXPECT_FALSE(player_board->removeAnimal(13, 5));
+	EXPECT_EQ(pasture2a->animal_type, PastureSpace::AnimalType::boar);
+	EXPECT_EQ(pasture2a->linked_quantity, 4);
+	EXPECT_EQ(pasture2b->animal_type, PastureSpace::AnimalType::boar);
+	EXPECT_EQ(pasture2b->linked_quantity, 4);
+	EXPECT_TRUE(player_board->removeAnimal(13, 3));
+	EXPECT_EQ(pasture2a->animal_type, PastureSpace::AnimalType::boar);
+	EXPECT_EQ(pasture2a->linked_quantity, 1);
+	EXPECT_EQ(pasture2b->animal_type, PastureSpace::AnimalType::boar);
+	EXPECT_EQ(pasture2b->linked_quantity, 1);
+	EXPECT_TRUE(player_board->removeAnimal(8, 1));
+	EXPECT_EQ(pasture2a->animal_type, PastureSpace::AnimalType::none);
+	EXPECT_EQ(pasture2a->linked_quantity, 0);
+	EXPECT_EQ(pasture2b->animal_type, PastureSpace::AnimalType::none);
+	EXPECT_EQ(pasture2b->linked_quantity, 0);
+	EXPECT_FALSE(player_board->removeAnimal(13, 2));
+	EXPECT_EQ(pasture2a->animal_type, PastureSpace::AnimalType::none);
+	EXPECT_EQ(pasture2a->linked_quantity, 0);
+	EXPECT_EQ(pasture2b->animal_type, PastureSpace::AnimalType::none);
+	EXPECT_EQ(pasture2b->linked_quantity, 0);
 }
+
+
+//// REFACTOR PASTURES TO INCLUDE FENCES
+//// TEST Split linked pasture by adding fence in middle (triple to 3 single)
+
 
 TEST_F(GenericPlayerBoard, convertSpaceToStable) {
 	//test valid conversion to stable

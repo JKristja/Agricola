@@ -15,7 +15,7 @@ initializeSpaces();
 }
 
 PlayerBoard::~PlayerBoard() {
-	for (int i = 0; i < 15; i++) {
+	for (int i = 0; i < 15; ++i) {
 		delete this->spaces[i];
 	}
 }
@@ -26,7 +26,7 @@ PlayerBoardSpace* PlayerBoard::getBoardSpace(int index) {
 
 void PlayerBoard::initializeSpaces() {
 	// set empty board with mid and bottom leftmost spaces starting room spaces
-	for (int i = 0; i < 15; i++)
+	for (int i = 0; i < 15; ++i)
 		if (i != 5 && i != 10)
 			this->spaces[i] = new EmptySpace(i);
 
@@ -59,7 +59,8 @@ bool PlayerBoard::convertSpace(int index, PlayerBoardSpace::SpaceType to_type) {
 			break;
 		case PlayerBoardSpace::SpaceType::pasture:
 			if (((EmptySpace*)space)->to_pasture) {
-				convertToPasture(vector<int> {index});
+				convertToPasture(vector<int> {index}, 
+					PastureSpace::AnimalType::none);
 				converted = true;
 			}
 			break;
@@ -73,7 +74,8 @@ bool PlayerBoard::convertSpace(int index, PlayerBoardSpace::SpaceType to_type) {
 	}
 	else if (space->type == PlayerBoardSpace::SpaceType::stable) {
 		if (to_type == PlayerBoardSpace::SpaceType::pasture) {
-			convertToPasture(vector<int> {index});
+			convertToPasture(vector<int> {index},
+				((StableSpace*)space)->animal_type);
 			converted = true;
 		}
 	}
@@ -123,6 +125,24 @@ void PlayerBoard::notifyNeighbour(int index, PlayerBoardSpace::SpaceType caller)
 	}
 }
 
+bool PlayerBoard::validNeighbour(int index1, int index2) {
+	bool is_neighbour = false;
+	if (index1 % 5 != 0)
+		if (index2 == index1 - 1)
+			is_neighbour = true;
+	if (index1 % 5 != 4)
+		if (index2 == index1 + 1)
+			is_neighbour = true;
+	if (index1 > 4)
+		if (index2 == index1 - 5)
+			is_neighbour = true;
+	if (index1 < 10)
+		if (index2 == index1 + 5)
+			is_neighbour = true;
+
+	return is_neighbour;
+}
+
 void PlayerBoard::convertToRoom(int index) {
 	RoomSpace* current_house = ((RoomSpace*)this->spaces[5]);
 
@@ -131,7 +151,7 @@ void PlayerBoard::convertToRoom(int index) {
 		new RoomSpace(index, current_house->room_type, false);
 	delete old_space;
 
-	this->num_rooms += 1;
+	++this->num_rooms;
 }
 
 void PlayerBoard::convertToField(int index) {
@@ -140,11 +160,11 @@ void PlayerBoard::convertToField(int index) {
 	delete old_space;
 
 	if (num_fields == 0)
-		for (int i = 0; i < sizeof(spaces) / sizeof(PlayerBoardSpace*); i++)
+		for (int i = 0; i < sizeof(spaces) / sizeof(PlayerBoardSpace*); ++i)
 			if (spaces[i]->type == PlayerBoardSpace::SpaceType::empty)
 				((EmptySpace*)spaces[i])->to_field = false;
 
-	this->num_fields += 1;
+	++this->num_fields;
 }
 
 bool FieldSpace::sow(FieldType type) {
@@ -167,51 +187,193 @@ FieldSpace::FieldType FieldSpace::harvest() {
 
 	return harvested_type;
 }
-
-// UPDATE TO HAVE ANIMAL TYPE INPUT
-// UPDATE LINKED PASTURE CONVERT TO ALLOW FOR ANIMAL TYPE
-// PLAYER ACTION WILL HAVE TO CHECK IF MIXED TYPE AND PROMPT SELECTION
-// IF NO MIXED TYPE PLAYER ACTION WILL DEFAULT TO EXISTING TYPE
-
-void PlayerBoard::convertToPasture(vector<int> indices) {
+void PlayerBoard::convertToPasture(vector<int> indices, 
+	PastureSpace::AnimalType animal_type) {
 	if (indices.size() == 0)
 		return;
 
-	bool stable;
+	bool stable = false;
 	int linked_stables = 0;
+	int linked_quantity = 0;
 	vector<PastureSpace*> linked_pastures;
 	
-	for (int i = 0; i < indices.size(); i++)
-		if (spaces[indices[i]]->type == PlayerBoardSpace::SpaceType::stable)
-			linked_stables += 1;
-	
-	for (int i = 0; i < indices.size(); i++) {
-		PlayerBoardSpace* old_space = spaces[indices[i]];
-		stable = (old_space->type == PlayerBoardSpace::SpaceType::stable);
-		PastureSpace* new_space = new PastureSpace(i, stable, linked_stables);
-		spaces[indices[i]] = new_space;
+	for (int index : indices)
+		if (spaces[index]->type == PlayerBoardSpace::SpaceType::stable)
+			++linked_stables;
+
+	for (int index : indices) {
+		PlayerBoardSpace* old_space = spaces[index];
+		if (old_space->type == PlayerBoardSpace::SpaceType::stable) {
+			stable = true;
+			if (animal_type != PastureSpace::AnimalType::none &&
+				((StableSpace*)old_space)->animal &&
+				((StableSpace*)old_space)->animal_type == animal_type) {
+				++linked_quantity;
+			}
+			else if (((StableSpace*)old_space)->animal) {
+				--this->num_animals;
+			}
+		}
+		PastureSpace* new_space = new PastureSpace(index, stable, 
+			linked_stables, indices.size(), animal_type);
+		spaces[index] = new_space;
 		linked_pastures.push_back(new_space);
 		delete old_space;
 	}
 
-	for (int i = 0; i < indices.size(); i++)
-		((PastureSpace*)spaces[indices[i]])->linked_pastures = linked_pastures;
+	for (int index : indices) {
+		((PastureSpace*)spaces[index])->linked_pastures = linked_pastures;
+		((PastureSpace*)spaces[index])->linked_quantity = linked_quantity;
+	}
 
-	this->num_pastures += 1;
+	if (num_pastures == 0)
+		for (int i = 0; i < sizeof(spaces) / sizeof(PlayerBoardSpace*); ++i)
+			if (spaces[i]->type == PlayerBoardSpace::SpaceType::empty)
+				((EmptySpace*)spaces[i])->to_pasture = false;
+
+	++this->num_pastures;
 	this->animal_capacity += 2 * indices.size() * pow(2, linked_stables);
+	this->num_animals += linked_quantity;
 }
 
-bool PlayerBoard::convertToLinkedPasture(vector<int> indices) {
-	//stub
-	return false;
+bool PlayerBoard::convertToLinkedPasture(vector<int> indices,
+	PastureSpace::AnimalType animal_type) {
+	if (indices.size() == 0)
+		return false;
+	//check all spaces convertable and at least one valid empty/stable to link
+	int connections = 1;
+	bool valid = false;
+	for (int i = 0; i < indices.size(); ++i) {
+		PlayerBoardSpace::SpaceType space_type = spaces[indices[i]]->type;
+		if (space_type == PlayerBoardSpace::SpaceType::empty) {
+			if (((EmptySpace*)spaces[indices[i]])->to_pasture)
+				valid = true;
+		}
+		else if (space_type == PlayerBoardSpace::SpaceType::stable) {
+			if (((StableSpace*)spaces[indices[i]])->to_pasture)
+				valid = true;
+		}
+		else {
+			return false;
+		}
+		//check valid indices orthogonal to each other
+		for (int j = i + 1; j < indices.size(); ++j) {
+			int current = indices[i];
+			int neighbour = indices[j];
+			if (validNeighbour(current, neighbour))
+				++connections;
+		}
+	}
+
+	if (!valid || connections != indices.size())
+		return false;
+
+	convertToPasture(indices, animal_type);
+	for (int index : indices)
+		notifyNeighbours(index, PlayerBoardSpace::SpaceType::pasture);
+
+	return true;
 }
 
 void PlayerBoard::convertToStable(int index) {
-	//stub
+	PlayerBoardSpace* old_space = this->spaces[index];
+	this->spaces[index] = 
+		new StableSpace(index, ((EmptySpace*)old_space)->to_pasture);
+	delete old_space;
+
+	++this->num_stables;
+}
+
+bool PlayerBoard::addStable(int index) {
+	if (spaces[index]->type == PlayerBoardSpace::SpaceType::empty) {
+		this->convertSpace(index, PlayerBoardSpace::SpaceType::stable);
+		return true;
+	}
+
+	if (spaces[index]->type == PlayerBoardSpace::SpaceType::pasture) {
+		PastureSpace* pasture_space = (PastureSpace*)spaces[index];
+		if (pasture_space->stable)
+			return false;
+
+		pasture_space->stable = true;
+		int existing_pasture_cap = pasture_space->linked_capacity;
+		for (auto adjoined : pasture_space->linked_pastures) {
+			++adjoined->linked_stables;
+			adjoined->linked_capacity *= 2;
+		}
+		this->animal_capacity += existing_pasture_cap;
+		++this->num_stables;
+		return true;
+	}
+	return false;
+}
+
+bool PlayerBoard::addAnimal(int index, int num_animals,
+	PastureSpace::AnimalType type) {
+	if (num_animals <= 0 || type == PastureSpace::AnimalType::none)
+		return false;
+
+	//check valid space
+	if (spaces[index]->type == PlayerBoardSpace::SpaceType::stable) {
+		StableSpace* board_space = (StableSpace*)spaces[index];
+		if (num_animals != 1 || board_space->animal)
+			return false;
+		board_space->animal = true;
+		board_space->animal_type = type;
+		++this->num_animals;
+		return true;
+	} 
+	else if (spaces[index]->type == PlayerBoardSpace::SpaceType::pasture) {
+		PastureSpace* board_space = (PastureSpace*)spaces[index];
+		if (board_space->animal_type != PastureSpace::AnimalType::none &&
+			board_space->animal_type != type)
+			return false;
+		if (board_space->linked_quantity + num_animals > 
+			board_space->linked_capacity)
+			return false;
+		for (auto pasture : board_space->linked_pastures) {
+			pasture->animal_type = type;
+			pasture->linked_quantity += num_animals;
+		}
+		this->num_animals += num_animals;
+		return true;
+	}
+	else {
+		return false;
+	}
+}
+
+
+bool PlayerBoard::removeAnimal(int index, int num_animals) {
+	if (num_animals <= 0)
+		return false;
+	
+	if (spaces[index]->type == PlayerBoardSpace::SpaceType::stable) {
+		StableSpace* board_space = (StableSpace*)spaces[index];
+		if (!board_space->animal || num_animals != 1)
+			return false;
+		board_space->animal = false;
+		board_space->animal_type = PastureSpace::AnimalType::none;
+		--this->num_animals;
+	}
+	else if (spaces[index]->type == PlayerBoardSpace::SpaceType::pasture) {
+		PastureSpace* board_space = (PastureSpace*)spaces[index];
+		if (board_space->linked_quantity < num_animals)
+			return false;
+		for (auto pasture : board_space->linked_pastures) {
+			pasture->linked_quantity -= num_animals;
+			if (pasture->linked_quantity == 0)
+				pasture->animal_type = PastureSpace::AnimalType::none;
+		}
+		--this->num_animals;
+	}
+	else {
+		return false;
+	}
 }
 
 bool PlayerBoard::upgradeRooms() {
-	for (int i = 0; i < sizeof(spaces) / sizeof(PlayerBoardSpace*); i++) {
+	for (int i = 0; i < sizeof(spaces) / sizeof(PlayerBoardSpace*); ++i) {
 		if (spaces[i]->type == PlayerBoardSpace::SpaceType::room) {
 			RoomSpace* room_i = ((RoomSpace*)spaces[i]);
 			if (room_i->room_type == RoomSpace::RoomType::stone)
@@ -235,6 +397,7 @@ bool PlayerBoard::addPet(int room_index, PastureSpace::AnimalType pet_type) {
 	this->pet = true;
 	this->pet_index = room_index;
 	this->pet_type = pet_type;
+	++this->num_animals;
 	return true;
 }
 
@@ -256,6 +419,7 @@ bool PlayerBoard::removePet() {
 	this->pet = false;
 	this->pet_type = PastureSpace::AnimalType::none;
 	this->pet_index = -1;
+	--this->num_animals;
 	return true;
 }
 
